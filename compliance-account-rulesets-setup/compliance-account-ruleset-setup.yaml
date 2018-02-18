@@ -16,12 +16,27 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Sets up the RuleSet
 Parameters:
-  SourceLambdaBucket:
+  SourceCfnBucketKey:
     Type: String
-    Description: Bucket name where lambda code zips are placed
+    Description: Bucket name and key cloudformation templates are placed.
     MaxLength: 63
     MinLength: 3
-    ConstraintDescription: Enter the name not the ARN, must be in the same region as the stack
+    ConstraintDescription: Enter the name (not the ARN) and include the key without trailing "/"; must be in the same region as the CloudFormation stack
+
+  SourceLambdaBucket:
+    Type: String
+    Description: Bucket name and key where lambda code zips are placed
+    MaxLength: 63
+    MinLength: 3
+    ConstraintDescription: Enter the name (not the ARN); must be in the same region as the CloudFormation stack
+
+  SourceLambdaKeyPrefix:
+    Type: String
+    Description: Object key prefix where lambda code zips are placed.
+    MaxLength: 63
+    MinLength: 3
+    ConstraintDescription: Enter the name (not the ARN) and include the key without trailing "/"; must be in the same region as the CloudFormation stack
+
   LambdaRuleIAMRoleARN:
     Type: String
     Description: IAM Role used by Lambda
@@ -37,46 +52,51 @@ Resources:
   CreateIAMRuleStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-rule-lambda-setup.yaml']]
+      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-rule-lambda-setup.yaml']]
       Parameters:
         RuleSetName: SecurityEpic1-Identity_and_Access_Management
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !Ref LambdaRuleIAMRoleARN
 
   CreateLMRuleStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-rule-lambda-setup.yaml']]
+      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-rule-lambda-setup.yaml']]
       Parameters:
         RuleSetName: SecurityEpic2-Logging_and_Monitoring
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !Ref LambdaRuleIAMRoleARN
 
   CreateISRuleStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-rule-lambda-setup.yaml']]
+      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-rule-lambda-setup.yaml']]
       Parameters:
         RuleSetName: SecurityEpic3-Infrastructure_Security
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !Ref LambdaRuleIAMRoleARN
 
   CreateDPRuleStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-rule-lambda-setup.yaml']]
+      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-rule-lambda-setup.yaml']]
       Parameters:
         RuleSetName: SecurityEpic4-Data_Protection
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !Ref LambdaRuleIAMRoleARN
 
   # CreateRRuleStack:
     # Type: AWS::CloudFormation::Stack
     # Properties:
-      # TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-rule-lambda-setup.yaml']]
+      # TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-rule-lambda-setup.yaml']]
       # Parameters:
         # RuleSetName: SecurityEpic6-Resilience
         # SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         # LambdaRuleRoleARN: !Ref LambdaRuleIAMRoleARN
 
 #
@@ -86,8 +106,9 @@ Resources:
   CreateRuleSetReporterStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ["/", ["https://s3.amazonaws.com", !Ref SourceLambdaBucket, "compliance-account-rule-lambda-setup.yaml"]]
+      TemplateURL: !Join ["/", ["https://s3.amazonaws.com", !Ref SourceCfnBucketKey, "compliance-account-rule-lambda-setup.yaml"]]
       Parameters:
         RuleSetName: SecurityEpic7-Compliance_Validation
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !Ref LambdaRuleIAMRoleARN

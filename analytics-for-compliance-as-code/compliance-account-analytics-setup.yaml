@@ -16,17 +16,34 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Sets up the Analytics for the Compliance-as-Code.
 Parameters:
-  SourceLambdaBucket:
+  SourceCfnBucketKey:
     Type: String
-    Description: Bucket name where lambda code zips are placed
+    Description: Bucket name and key cloudformation templates are placed.
+    Default: ellation-grc-global-dist/cloudformation
     MaxLength: 63
     MinLength: 3
-    ConstraintDescription: Enter the name not the ARN, must be in the same region as the stack
+    ConstraintDescription: Enter the name (not the ARN) and include the key without trailing "/"; must be in the same region as the CloudFormation stack
+
+  SourceLambdaBucket:
+    Type: String
+    Description: Bucket name and key where lambda code zips are placed
+    Default: ellation-grc-global-dist
+    MaxLength: 63
+    MinLength: 3
+    ConstraintDescription: Enter the name (not the ARN); must be in the same region as the CloudFormation stack
+
+  SourceLambdaKeyPrefix:
+    Type: String
+    Description: Object key prefix where lambda code zips are placed.
+    Default: lambdas/
+    MaxLength: 63
+    MinLength: 3
+    ConstraintDescription: Enter the prefix with trailing "/"
 
   ReportS3BucketName:
     ConstraintDescription: Enter DNS-compliant prefix
     Description: Bucket prefix where the processed CSV including the data from DynamoDB are stored. A dash and the account ID (12-digit) will be appended to it
-    Default: analytics-compliance-as-code
+    Default: ellation-grc-global-reports
     MaxLength: 63
     MinLength: 10
     Type: String
@@ -160,10 +177,11 @@ Resources:
   CreateLambdaCSVforEvents:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-analytics-lambda-setup.yaml']]
+      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-analytics-lambda-setup.yaml']]
       Parameters:
         LambdaName: csv_ComplianceEventsTable_to_s3
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
         DestinationBucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
     DependsOn:
@@ -174,10 +192,11 @@ Resources:
     Condition: DataSample
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-analytics-lambda-setup.yaml']]
+      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-analytics-lambda-setup.yaml']]
       Parameters:
         LambdaName: GenerateData
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
         DestinationBucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
     DependsOn:
@@ -188,10 +207,11 @@ Resources:
     Condition: DataSample
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-analytics-lambda-setup.yaml']]
+      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-analytics-lambda-setup.yaml']]
       Parameters:
         LambdaName: DeleteData
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
         DestinationBucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
     DependsOn:
@@ -202,10 +222,11 @@ Resources:
     Condition: DataSample
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceLambdaBucket, 'compliance-account-analytics-lambda-setup.yaml']]
+      TemplateURL: !Join ['/', ['https://s3.amazonaws.com', !Ref SourceCfnBucketKey, 'compliance-account-analytics-lambda-setup.yaml']]
       Parameters:
         LambdaName: GenerateData_PushBatchDynamoDB24items
         SourceLambdaBucket: !Ref SourceLambdaBucket
+        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
         DestinationBucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
     DependsOn:

@@ -22,14 +22,23 @@ Description: Sets up a rule of the RuleSet
 Parameters:
   SourceLambdaBucket:
     Type: String
-    Description: Bucket name where lambda code zips are placed
+    Description: Bucket name and key where lambda code zips are placed
     MaxLength: 63
     MinLength: 3
-    ConstraintDescription: Enter the name not the ARN, must be in the same region than the stack
+    ConstraintDescription: Enter the name (not the ARN); must be in the same region as the CloudFormation stack
+
+  SourceLambdaKeyPrefix:
+    Type: String
+    Description: Object key prefix where lambda code zips are placed.
+    MaxLength: 63
+    MinLength: 3
+    ConstraintDescription: Enter the prefix with trailing "/"
+
   RuleSetName:
     Type: String
     Description: Lambda zip name to deploy (name of rule will be the same)
     ConstraintDescription: Do not include ".zip"
+
   LambdaRuleRoleARN:
     ConstraintDescription: Enter Role ARN to be attached to the Lambda
     Description: Must be full ARN of the IAM Role
@@ -43,7 +52,7 @@ Resources:
         S3Bucket: !Ref SourceLambdaBucket
         S3Key: !Join
           - ""
-          - - "lambda/"
+          - - !Ref SourceLambdaKeyPrefix
             - !Join [ ".", [ !Ref RuleSetName , zip]]
       FunctionName: !Ref RuleSetName
       Handler: !Join [ ".", [ !Ref RuleSetName , lambda_handler]]
