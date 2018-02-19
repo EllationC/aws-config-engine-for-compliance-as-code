@@ -188,24 +188,6 @@ Resources:
     - LambdaRuleIAMRole
     - ReportS3Bucket
 
-  ScheduledEventsToS3Rule:
-    Type: "AWS::Events::Rule"
-    Properties:
-      Description: "Push compliance event data to S3"
-      ScheduleExpression: "rate(1 hour)"
-      State: "ENABLED"
-      Targets:
-        - Arn: !GetAtt CreateLambdaCSVforEvents.Arn
-        - Id: "TargetFunctionV1"
-
-  PermissionForEventsToInvokeLambda:
-    Type: "AWS::Lambda::Permission"
-    Properties:
-      FunctionName: !Ref CreateLambdaCSVforEvents
-      Action: "lambda:InvokeFunction"
-      Principal: "events.amazonaws.com"
-      SourceArn: !GetAtt ScheduledEventsToS3Rule.Arn
-
   CreateLambdaGenerateData:
     Condition: DataSample
     Type: AWS::CloudFormation::Stack

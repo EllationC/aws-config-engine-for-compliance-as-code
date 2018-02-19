@@ -70,3 +70,23 @@ Resources:
       FunctionName: !Ref LambdaName
       Principal: lambda.amazonaws.com
     DependsOn: RuleSetRuleLambda
+
+  ScheduledEventsRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: "Scheduled event trigger"
+      ScheduleExpression: "rate(1 hour)"
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt RuleSetRuleLambda.Arn
+        - Id: !Ref LambdaName
+    DependsOn: RuleSetRuleLambda
+
+  PermissionForEventsToInvokeLambda:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      FunctionName: !Ref LambdaName
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ScheduledEventsRule.Arn
+    DependsOn: RuleSetRuleLambda
