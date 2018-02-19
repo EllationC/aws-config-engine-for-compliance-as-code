@@ -43,6 +43,20 @@ Parameters:
   DestinationBucket:
     Description: Bucket name where the CSV should be pushed.
     Type: String
+  CreateScheduledEventTrigger:
+    Description: Create scheduled event trigger.
+    Default: false
+    AllowedValues:
+      - true
+      - false
+    Type: String
+  EventTriggerSchedule:
+    Description: Create scheduled event trigger.
+    Default: rate(1 day)
+    Type: String
+
+Conditions:
+  CreateScheduledEventTrigger: !Equals [ !Ref CreateScheduledEventTrigger, true ]
 
 Resources:
   RuleSetRuleLambda:
@@ -72,21 +86,26 @@ Resources:
     DependsOn: RuleSetRuleLambda
 
   ScheduledEventsRule:
+    Condition: CreateScheduledEventTrigger
     Type: "AWS::Events::Rule"
     Properties:
       Description: "Scheduled event trigger"
-      ScheduleExpression: "rate(1 hour)"
+      ScheduleExpression: !Ref EventTriggerSchedule
       State: "ENABLED"
       Targets:
-        - Arn: !GetAtt RuleSetRuleLambda.Arn
-        - Id: !Ref LambdaName
+        -
+          Arn: !GetAtt RuleSetRuleLambda.Arn
+          Id: !Ref LambdaName
     DependsOn: RuleSetRuleLambda
 
   PermissionForEventsToInvokeLambda:
+    Condition: CreateScheduledEventTrigger
     Type: "AWS::Lambda::Permission"
     Properties:
       FunctionName: !Ref LambdaName
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
       SourceArn: !GetAtt ScheduledEventsRule.Arn
-    DependsOn: RuleSetRuleLambda
+    DependsOn:
+    - RuleSetRuleLambda
+    - ScheduledEventsRule

@@ -184,6 +184,8 @@ Resources:
         SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
         DestinationBucket: !Ref ReportS3BucketName
+        CreateScheduledEventTrigger: true
+        EventTriggerSchedule: rate(1 hour)
     DependsOn:
     - LambdaRuleIAMRole
     - ReportS3Bucket
