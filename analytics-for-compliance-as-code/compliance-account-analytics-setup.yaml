@@ -42,7 +42,7 @@ Parameters:
 
   ReportS3BucketName:
     ConstraintDescription: Enter DNS-compliant prefix
-    Description: Bucket prefix where the processed CSV including the data from DynamoDB are stored. A dash and the account ID (12-digit) will be appended to it
+    Description: Bucket prefix where the processed CSV including the data from DynamoDB are stored.
     Default: ellation-grc-global-reports
     MaxLength: 63
     MinLength: 10
@@ -144,7 +144,7 @@ Resources:
   ReportS3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
+      BucketName: !Ref ReportS3BucketName
       LifecycleConfiguration:
         Rules:
         - Status: Enabled
@@ -161,7 +161,7 @@ Resources:
     DependsOn: ReportS3Bucket
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
+      Bucket: !Ref ReportS3BucketName
       PolicyDocument:
         Statement:
         - Action: s3:*
@@ -169,8 +169,8 @@ Resources:
           Principal:
             AWS: !GetAtt LambdaRuleIAMRole.Arn
           Resource:
-            - !Join [ "", ["arn:aws:s3:::", !Ref ReportS3BucketName, "-", !Ref 'AWS::AccountId']]
-            - !Join [ "", ["arn:aws:s3:::", !Ref ReportS3BucketName, "-", !Ref 'AWS::AccountId','/*']]
+            - !Join [ "", ["arn:aws:s3:::", !Ref ReportS3BucketName]]
+            - !Join [ "", ["arn:aws:s3:::", !Ref ReportS3BucketName, '/*']]
           Sid: LambdaAllow
         Version: '2012-10-17'
 
@@ -183,10 +183,28 @@ Resources:
         SourceLambdaBucket: !Ref SourceLambdaBucket
         SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
-        DestinationBucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
+        DestinationBucket: !Ref ReportS3BucketName
     DependsOn:
     - LambdaRuleIAMRole
     - ReportS3Bucket
+
+  ScheduledEventsToS3Rule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: "Push compliance event data to S3"
+      ScheduleExpression: "rate(1 hour)"
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt CreateLambdaCSVforEvents.Arn
+        - Id: "TargetFunctionV1"
+
+  PermissionForEventsToInvokeLambda:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      FunctionName: !Ref CreateLambdaCSVforEvents
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt ScheduledEventsToS3Rule.Arn
 
   CreateLambdaGenerateData:
     Condition: DataSample
@@ -198,7 +216,7 @@ Resources:
         SourceLambdaBucket: !Ref SourceLambdaBucket
         SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
-        DestinationBucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
+        DestinationBucket: !Ref ReportS3BucketName
     DependsOn:
     - LambdaRuleIAMRole
     - ReportS3Bucket
@@ -213,7 +231,7 @@ Resources:
         SourceLambdaBucket: !Ref SourceLambdaBucket
         SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
-        DestinationBucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
+        DestinationBucket: !Ref ReportS3BucketName
     DependsOn:
     - LambdaRuleIAMRole
     - ReportS3Bucket
@@ -228,7 +246,7 @@ Resources:
         SourceLambdaBucket: !Ref SourceLambdaBucket
         SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         LambdaRuleRoleARN: !GetAtt LambdaRuleIAMRole.Arn
-        DestinationBucket: !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
+        DestinationBucket: !Ref ReportS3BucketName
     DependsOn:
     - LambdaRuleIAMRole
     - ReportS3Bucket
@@ -238,17 +256,17 @@ Resources:
     Properties:
       Database: "default"
       Description: "(To be run 1st) A query to build database for advanced analytics"
-      Name: "Database For ComplianceAsCode"
-      QueryString: "CREATE DATABASE IF NOT EXISTS complianceascode"
+      Name: "Database For ComplianceReport"
+      QueryString: "CREATE DATABASE IF NOT EXISTS compliancereport"
 
   AthenaNamedQueryInitTable:
     Type: AWS::Athena::NamedQuery
     Properties:
-      Database: "complianceascode"
+      Database: "compliancereport"
       Description: "(To be run 2nd) A query to build table for advanced analytics"
-      Name: "Table For ComplianceAsCode"
+      Name: "Table For ComplianceReport"
       QueryString: !Join
         - ""
-        - - "CREATE EXTERNAL TABLE IF NOT EXISTS complianceascode.events (AccountID string,ComplianceType string,RecordedInDDBTimestamp string,RuleName string,LastResultRecordedTime string,RuleARN string,ResourceID string,ResourceType string,AccountClassification string,RuleCriticity string) ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe' WITH SERDEPROPERTIES ('serialization.format' = ',', 'field.delim' = ',') LOCATION 's3://"
-          - !Join [ "-", [ !Ref ReportS3BucketName, !Ref 'AWS::AccountId']]
+        - - "CREATE EXTERNAL TABLE IF NOT EXISTS compliancereport.events (AccountID string,ComplianceType string,RecordedInDDBTimestamp string,RuleName string,LastResultRecordedTime string,RuleARN string,ResourceID string,ResourceType string,AccountClassification string,RuleCriticity string) ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe' WITH SERDEPROPERTIES ('serialization.format' = ',', 'field.delim' = ',') LOCATION 's3://"
+          - !Ref ReportS3BucketName
           - "/' TBLPROPERTIES('has_encrypted_data'='false', 'skip.header.line.count'='1')"
