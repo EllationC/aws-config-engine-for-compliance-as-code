@@ -176,14 +176,14 @@ Parameters:
   CentralizedS3BucketConfigFullName:
     ConstraintDescription: Enter DNS-compliant name
     Description: Bucket name where Config logs are centrally stored. It is located in the Compliance Account.
-    Default: centralized-config-112233445566
+    Default: ellation-grc-global-config-logs
     MaxLength: 63
     MinLength: 10
     Type: String
   ComplianceAccountId:
     ConstraintDescription: 12 digits, no dashes
     Description: Account ID of the Compliance Account. The compliance-as-code engine must be installed in this account first.
-    Default: 112233445566
+    Default: 520715645974
     MaxLength: 12
     MinLength: 12
     Type: String
