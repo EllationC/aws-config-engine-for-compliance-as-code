@@ -2,7 +2,7 @@
     "fileLocations": [
         {
             "URIs": [
-                "s3://analytics-compliance-as-code-520715645974/compliance_events.csv"
+                "s3://ellation-grc-global-reports/compliance_events.csv"
             ]
         }
     ],
