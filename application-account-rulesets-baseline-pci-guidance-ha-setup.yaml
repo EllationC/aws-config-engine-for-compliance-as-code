@@ -300,11 +300,35 @@ Conditions:
           - !Condition Extended
           - !Condition AccountClassificationAll
         - !Condition PCIguidance
-    IAM13: !And
+    IAM15to11: !Or
+        - !And
+          - !Condition High
+          - !Condition Extended
+          - !Condition AccountClassificationAll
+        - !Condition PCIguidance
+    IAM112: !And
         - !Condition Critical
         - !Condition Extended
         - !Condition AccountClassificationAll
-    IAM14: !Or
+    IAM113: !Or
+        - !And
+          - !Condition Critical
+          - !Condition Extended
+          - !Condition AccountClassificationAll
+        - !Condition PCIguidance
+    IAM114: !And
+        - !Condition High
+        - !Condition Extended
+        - !Condition AccountClassificationAll
+    IAM116: !And
+        - !Condition High
+        - !Condition Extended
+        - !Condition AccountClassificationAll
+    IAM121: !And
+        - !Condition Critical
+        - !Condition Extended
+        - !Condition AccountClassificationAll
+    IAM124: !Or
         - !And
           - !Condition High
           - !Condition Extended
@@ -786,9 +810,9 @@ Resources:
   # CIS 1.10  Ensure IAM password policy prevents password reuse
   # CIS 1.11  Ensure IAM password policy expires passwords within 90 days or less
   #==================================================
-  RuleSetDetailedRuleIAM5_11:
+  RuleSetDetailedRuleIAM5to11:
     Type: AWS::Config::ConfigRule
-    Condition: IAM15_11
+    Condition: IAM15to11
     Properties:
       ConfigRuleName: 2_HIGH-IAM_1_5_11-iam_password_policy
       Description: "Evaluates whether the account password policy for IAM users meets the specified requirements."
@@ -806,9 +830,9 @@ Resources:
       Source:
         Owner: AWS
         SourceIdentifier: IAM_PASSWORD_POLICY
-      DependsOn:
-      - ConfigurationRecorder
-      - DeliveryChannel
+    DependsOn:
+    - ConfigurationRecorder
+    - DeliveryChannel
 
   #==================================================
   # CIS 1.12	Ensure no root account access key exists
