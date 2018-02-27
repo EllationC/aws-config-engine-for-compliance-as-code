@@ -96,7 +96,7 @@ Resources:
       # Parameters:
         # RuleSetName: SecurityEpic6-Resilience
         # SourceLambdaBucket: !Ref SourceLambdaBucket
-        SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
+        # SourceLambdaKeyPrefix: !Ref SourceLambdaKeyPrefix
         # LambdaRuleRoleARN: !Ref LambdaRuleIAMRoleARN
 
 #

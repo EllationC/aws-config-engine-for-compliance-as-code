@@ -264,7 +264,7 @@ def IAM_1_24_iam_policy_no_full_star():
 
     for configuration_item in response["Policies"]:
         policy_info = iam.get_policy(PolicyArn=configuration_item["Arn"])
-        print policy_info
+        print(policy_info)
         if policy_info["Policy"]["IsAttachable"] is False:
             status = "NOT_APPLICABLE"
         else:
