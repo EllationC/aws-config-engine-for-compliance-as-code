@@ -587,6 +587,9 @@ Resources:
     - ConfigurationRecorder
     - DeliveryChannel
 
+#==================================================
+# CIS 1.1 Avoid the use of the "root" account
+#==================================================
   RuleSetDetailedRuleIAM1:
     Condition: IAM11
     Type: AWS::Config::ConfigRule
@@ -607,12 +610,15 @@ Resources:
     - ConfigurationRecorder
     - DeliveryChannel
 
+  #==================================================
+  # CIS 1.2:  Ensure multi-factor authentication (MFA) is enabled for all IAM users that have a console password
+  #==================================================
   RuleSetDetailedRuleIAM2:
     Condition: IAM12
     Type: AWS::Config::ConfigRule
     Properties:
-      ConfigRuleName: 1_CRITICAL-IAM_1_2-root_mfa_enabled
-      Description: "Check whether the root account user has MFA enabled."
+      ConfigRuleName: 1_CRITICAL-IAM_1_2-user_mfa_enabled
+      Description: "Check that all users have mfa enabled on their accounts."
       InputParameters:
         RoleToAssume: !Ref ComplianceAuditRoleName
       Source:
@@ -627,11 +633,191 @@ Resources:
     - ConfigurationRecorder
     - DeliveryChannel
 
-  RuleSetDetailedRuleIAM3:
-    Condition: IAM13
+  #==================================================
+  # CIS 1.3	Ensure credentials unused for 90 days or greater are disabled
+  # CIS 1.4	Ensure access keys are rotated every 90 days or less
+  #==================================================
+  # RoleForDisableUnusedCredentialsFunction:
+  #   Type: AWS::IAM::Role
+  #   DependsOn: ResourceForEvaluateCisBenchmarkingPreconditions
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version: 2012-10-17
+  #       Statement:
+  #         -
+  #           Effect: Allow
+  #           Principal:
+  #             Service: [lambda.amazonaws.com]
+  #           Action:
+  #             - sts:AssumeRole
+  #     ManagedPolicyArns:
+  #       - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  #     Policies:
+  #       -
+  #         PolicyName: DisableCredentials
+  #         PolicyDocument:
+  #           Version: 2012-10-17
+  #           Statement:
+  #             -
+  #               Effect: Allow
+  #               Action:
+  #                 - iam:DeleteLoginProfile
+  #                 - iam:GetAccessKeyLastUsed
+  #                 - iam:GetLoginProfile
+  #                 - iam:DeleteLoginProfile
+  #                 - iam:ListAccessKeys
+  #                 - iam:ListUsers
+  #                 - iam:UpdateAccessKey
+  #               Resource: "*"
+  #
+  # FunctionToDisableUnusedCredentials:
+  #   Type: AWS::Lambda::Function
+  #   DependsOn: RoleForDisableUnusedCredentialsFunction
+  #   Properties:
+  #     FunctionName: DisableUnusedCredentials
+  #     Code:
+  #       ZipFile: |
+  #         #==================================================================================================
+  #         # Function: DisableUnusedCredentials
+  #         # Purpose:  Disables unused credentials older than the given period.
+  #         #==================================================================================================
+  #
+  #         import boto3
+  #         import json
+  #         import datetime
+  #         from datetime import date
+  #
+  #         DEFAULT_AGE_THRESHOLD_IN_DAYS = 90
+  #
+  #         #==================================================================================================
+  #         # Function handler
+  #         #==================================================================================================
+  #         def lambda_handler(event, context):
+  #
+  #             return_value = {}
+  #             return_value['DeletedPasswords'] = []
+  #             return_value['DisabledAccessKeys'] = []
+  #
+  #             client = boto3.client('iam')
+  #
+  #             now = date(datetime.date.today().year, datetime.date.today().month, datetime.date.today().day)
+  #
+  #             # For each user, determine when:
+  #             # (1) the user last logged in and
+  #             # (2) when the user's access key were last used.
+  #             for user in client.list_users()['Users']:
+  #
+  #                 # Users who have never logged in or who don't have a password won't have the 'PasswordLastUsed' property.
+  #                 if 'PasswordLastUsed' in user:
+  #                     password_last_used = date(user['PasswordLastUsed'].year, user['PasswordLastUsed'].month, user['PasswordLastUsed'].day)
+  #                     age = (now - password_last_used).days
+  #                     if age > DEFAULT_AGE_THRESHOLD_IN_DAYS:
+  #
+  #                         # Danger, Will Robinson! Disable the user's password (delete login profile).
+  #                         print('The user {0} has not logged in to the console in {1} days.'.format(user['UserName'], age))
+  #                         print('DELETING password for {0}.'.format(user['UserName']))
+  #                         try:
+  #                             if client.get_login_profile(UserName = user['UserName']):
+  #                                 response = client.delete_login_profile(UserName = user['UserName'])
+  #                                 return_value['DeletedPasswords'].append({'UserName': user['UserName'], 'PasswordLastUsed': str(user['PasswordLastUsed'])})
+  #                         except:
+  #                             #No-op
+  #                             print('No login profile exists for {}. It may been already been deleted.'.format(user['UserName']))
+  #
+  #                 # Next, determine when the user's access keys were last used.
+  #                 for access_key in client.list_access_keys(UserName = user['UserName'])['AccessKeyMetadata']:
+  #                     if access_key['Status'] == 'Active':
+  #
+  #                         response = client.get_access_key_last_used(AccessKeyId = access_key['AccessKeyId'])
+  #                         if 'LastUsedDate' in response['AccessKeyLastUsed']:
+  #                             access_key_last_used_date = response['AccessKeyLastUsed']['LastUsedDate']
+  #
+  #                             access_key_last_used_date = date(access_key_last_used_date.year, access_key_last_used_date.month, access_key_last_used_date.day)
+  #                             age = (now - access_key_last_used_date).days
+  #                             if age > DEFAULT_AGE_THRESHOLD_IN_DAYS:
+  #
+  #                                 # Disable the access key.
+  #                                 print('The access key {0} has not been used in {1} days.'.format(access_key['AccessKeyId'], age))
+  #                                 print('DISABLING access key {0}.'.format(access_key['AccessKeyId']))
+  #
+  #                                 response = client.update_access_key(
+  #                                     UserName = user['UserName'],
+  #                                     AccessKeyId = access_key['AccessKeyId'],
+  #                                     Status = 'Inactive')
+  #
+  #                                 return_value['DisabledAccessKeys'].append({'AccessKeyId': access_key['AccessKeyId'], 'LastUsedDate': str(access_key_last_used_date)})
+  #
+  #             return return_value
+  #
+  #     Description: Deletes unused passwords and disables unused access keys
+  #     Handler: index.lambda_handler
+  #     MemorySize: 1024
+  #     Role: !GetAtt RoleForDisableUnusedCredentialsFunction.Arn
+  #     Runtime: python2.7
+  #     Timeout: 10
+  #
+  # LambdaPermissionForDisableUnusedCredentials:
+  #   Type: AWS::Lambda::Permission
+  #   DependsOn:
+  #     - FunctionToDisableUnusedCredentials
+  #   Properties:
+  #     FunctionName: !GetAtt FunctionToDisableUnusedCredentials.Arn
+  #     Action: lambda:InvokeFunction
+  #     Principal: events.amazonaws.com
+  #
+  # ScheduledRuleForDisableUnusedCredentials:
+  #   Type: AWS::Events::Rule
+  #   Properties:
+  #     Name: DisableUnusedCredentials
+  #     Description: Deletes unused passwords and disables unused access keys
+  #     ScheduleExpression: rate(1 day)
+  #     State: ENABLED
+  #     Targets:
+  #       -
+  #         Arn: !GetAtt FunctionToDisableUnusedCredentials.Arn
+  #         Id: TargetFunctionV1
+
+  #==================================================
+  # CIS 1.5 Ensure IAM password policy requires at least one uppercase letter
+  # CIS 1.6 Ensure IAM password policy require at least one lowercase letter
+  # CIS 1.7 Ensure IAM password policy require at least one symbol
+  # CIS 1.8 Ensure IAM password policy require at least one number
+  # CIS 1.9 Ensure IAM password policy requires minimum length of 14 or greater
+  # CIS 1.10  Ensure IAM password policy prevents password reuse
+  # CIS 1.11  Ensure IAM password policy expires passwords within 90 days or less
+  #==================================================
+  RuleSetDetailedRuleIAM5_11:
+    Type: AWS::Config::ConfigRule
+    Condition: IAM15_11
+    Properties:
+      ConfigRuleName: 2_HIGH-IAM_1_5_11-iam_password_policy
+      Description: "Evaluates whether the account password policy for IAM users meets the specified requirements."
+      Scope:
+        ComplianceResourceTypes:
+          - AWS::IAM::User
+      InputParameters:
+        RequireUppercaseCharacters: true
+        RequireLowercaseCharacters: true
+        RequireSymbols: true
+        RequireNumbers: true
+        MinimumPasswordLength: 14
+        PasswordReusePrevention: 24
+        MaxPasswordAge: 90
+      Source:
+        Owner: AWS
+        SourceIdentifier: IAM_PASSWORD_POLICY
+      DependsOn:
+      - ConfigurationRecorder
+      - DeliveryChannel
+
+  #==================================================
+  # CIS 1.12	Ensure no root account access key exists
+  #==================================================
+  RuleSetDetailedRuleIAM12:
+    Condition: IAM112
     Type: AWS::Config::ConfigRule
     Properties:
-      ConfigRuleName: 1_CRITICAL-IAM_1_3-root_no_access_key
+      ConfigRuleName: 1_CRITICAL-IAM_1_12-root_no_access_key
       Description: "Check the root account user has no access key."
       InputParameters:
         RoleToAssume: !Ref ComplianceAuditRoleName
@@ -647,11 +833,106 @@ Resources:
     - ConfigurationRecorder
     - DeliveryChannel
 
-  RuleSetDetailedRuleIAM4:
-    Condition: IAM14
+  #==================================================
+  # CIS 1.13	Ensure MFA is enabled for the "root" account
+  #==================================================
+  RuleSetDetailedRuleIAM13:
+    Condition: IAM113
     Type: AWS::Config::ConfigRule
     Properties:
-      ConfigRuleName: 2_HIGH-IAM_1_4-iam_policy_no_full_star
+      ConfigRuleName: 1_CRITICAL-IAM_1_13-root_mfa_enabled
+      Description: "Check whether the root account user has MFA enabled."
+      InputParameters:
+        RoleToAssume: !Ref ComplianceAuditRoleName
+      Source:
+        Owner: CUSTOM_LAMBDA
+        SourceIdentifier: !Join [ ':', [ 'arn:aws:lambda', !Ref 'AWS::Region', !Ref ComplianceAccountId, 'function', SecurityEpic1-Identity_and_Access_Management ] ]
+        SourceDetails:
+        -
+          EventSource: 'aws.config'
+          MessageType: ScheduledNotification
+          MaximumExecutionFrequency: TwentyFour_Hours
+    DependsOn:
+    - ConfigurationRecorder
+    - DeliveryChannel
+
+  #==================================================
+  # CIS 1.14	Ensure hardware MFA is enabled for the "root" account
+  #==================================================
+  RuleSetDetailedRuleIAM14:
+    Condition: IAM114
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: 2_HIGH-IAM_1_14-root_hardware_mfa
+      Description: Ensure hardware MFA is enabled for the root account.
+      InputParameters:
+        RoleToAssume: !Ref ComplianceAuditRoleName
+      Source:
+        Owner: CUSTOM_LAMBDA
+        SourceIdentifier: !Join [ ':', [ 'arn:aws:lambda', !Ref 'AWS::Region', !Ref ComplianceAccountId, 'function', SecurityEpic1-Identity_and_Access_Management ] ]
+        SourceDetails:
+        -
+          EventSource: 'aws.config'
+          MessageType: ScheduledNotification
+          MaximumExecutionFrequency: TwentyFour_Hours
+    DependsOn:
+    - ConfigurationRecorder
+    - DeliveryChannel
+
+  #==================================================
+  # CIS 1.16	Ensure IAM policies are attached only to groups or roles
+  #==================================================
+  RuleSetDetailedRuleIAM16:
+    Condition: IAM116
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: 2_HIGH-IAM_1_16-iam_policies_only_group_roles
+      Description: Ensure IAM policies are attached only to groups or roles.
+      InputParameters:
+        RoleToAssume: !Ref ComplianceAuditRoleName
+      Source:
+        Owner: CUSTOM_LAMBDA
+        SourceIdentifier: !Join [ ':', [ 'arn:aws:lambda', !Ref 'AWS::Region', !Ref ComplianceAccountId, 'function', SecurityEpic1-Identity_and_Access_Management ] ]
+        SourceDetails:
+        -
+          EventSource: 'aws.config'
+          MessageType: ScheduledNotification
+          MaximumExecutionFrequency: TwentyFour_Hours
+    DependsOn:
+    - ConfigurationRecorder
+    - DeliveryChannel
+
+  #==================================================
+  # CIS 1.21	Ensure IAM instance roles are used for AWS resource access from instances
+  #==================================================
+  RuleSetDetailedRuleIAM21:
+    Condition: IAM121
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: 1_CRITICAL-IAM_1_21-instance_role_use
+      Description: Evaluates whether instances use instance roles.
+      InputParameters:
+        RoleToAssume: !Ref ComplianceAuditRoleName
+      Source:
+        Owner: CUSTOM_LAMBDA
+        SourceIdentifier: !Join [ ':', [ 'arn:aws:lambda', !Ref 'AWS::Region', !Ref ComplianceAccountId, 'function', SecurityEpic1-Identity_and_Access_Management ] ]
+        SourceDetails:
+        -
+          EventSource: 'aws.config'
+          MessageType: ScheduledNotification
+          MaximumExecutionFrequency: TwentyFour_Hours
+    DependsOn:
+    - ConfigurationRecorder
+    - DeliveryChannel
+
+  #==================================================
+  # CIS 1.24	Check whether an IAM user has an IAM policy with all permission enabled (or "Action:*"). It includes the AWS-managed policy named AdministratorAccess.
+  #==================================================
+  RuleSetDetailedRuleIAM24:
+    Condition: IAM124
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: 2_HIGH-IAM_1_24-iam_policy_no_full_star
       Description: Check whether an IAM user has an IAM policy with all permission enabled (or "Action:*"). It includes the AWS-managed policy named AdministratorAccess.
       InputParameters:
         RoleToAssume: !Ref ComplianceAuditRoleName
